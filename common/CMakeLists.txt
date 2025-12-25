@@ -1,8 +1,24 @@
 project(SyslogKitCommon)
 
-add_library(syslogkitbase STATIC
-        src/SyslogProto.cc
-        inc/SyslogKit/SyslogProto
+set(SQLITE_SOURCES
+        vendor/sqlite3/sqlite3.c
+        vendor/sqlite3/sqlite3.h
 )
 
-target_include_directories(syslogkitbase PUBLIC inc)
+add_library(syslogkitbase STATIC
+        src/SyslogProto.cc
+        src/SyslogServer.cc
+        src/LogStorage.cc
+        inc/SyslogKit/SyslogProto
+        inc/SyslogKit/SyslogServer
+        inc/SyslogKit/LogStorage
+        ${SQLITE_SOURCES}
+)
+
+target_include_directories(syslogkitbase PUBLIC inc vendor/sqlite3)
+if(UNIX)
+    target_link_libraries(syslogkitbase PRIVATE pthread dl)
+endif()
+if(WIN32)
+    target_link_libraries(syslogkitbase PRIVATE ws2_32)
+endif()

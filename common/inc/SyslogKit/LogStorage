@@ -1,0 +1,30 @@
+#pragma once
+#include "SyslogProto"
+#include <vector>
+#include <string>
+
+struct sqlite3;
+
+namespace SyslogKit {
+
+    struct LogFilter {
+        std::string search_text;
+        int min_severity = -1; // -1 = все
+        int limit = 1000;
+    };
+
+    class LogStorage {
+    public:
+        LogStorage();
+        ~LogStorage();
+
+        bool open(const std::string& path);
+        void close();
+        bool write(const SyslogMessage& msg);
+        std::vector<SyslogMessage> query(const LogFilter& filter);
+
+    private:
+        void init_table();
+        sqlite3* db_ = nullptr;
+    };
+}

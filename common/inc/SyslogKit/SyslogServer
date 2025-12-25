@@ -1,0 +1,29 @@
+#pragma once
+#include "SyslogProto"
+#include <functional>
+#include <thread>
+#include <atomic>
+
+namespace SyslogKit {
+
+    class Server {
+    public:
+        using Callback = std::function<void(SyslogMessage)>;
+
+        Server();
+        ~Server();
+
+        void start(uint16_t port, bool udp, bool tcp);
+        void stop();
+        void set_callback(Callback cb) { callback_ = cb; }
+
+    private:
+        void udp_loop(uint16_t port);
+        void tcp_loop(uint16_t port);
+
+        std::atomic<bool> running_{false};
+        std::jthread udp_thread_;
+        std::jthread tcp_thread_;
+        Callback callback_;
+    };
+}

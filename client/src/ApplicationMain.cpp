@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
-    SyslogClientWidget window;
+    MainWindow window;
     window.setWindowTitle("Syslog Kit Client");
     window.show();
     return QApplication::exec();
