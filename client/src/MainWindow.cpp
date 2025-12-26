@@ -110,27 +110,11 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::setupTheme() {
-    qApp->setStyle("Fusion");
-    QPalette p = qApp->palette();
-    p.setColor(QPalette::Window, QColor(53, 53, 53));
-    p.setColor(QPalette::WindowText, Qt::white);
-    p.setColor(QPalette::Base, QColor(25, 25, 25));
-    p.setColor(QPalette::AlternateBase, QColor(53, 53, 53));
-    p.setColor(QPalette::ToolTipBase, Qt::white);
-    p.setColor(QPalette::ToolTipText, Qt::white);
-    p.setColor(QPalette::Text, Qt::white);
-    p.setColor(QPalette::Button, QColor(53, 53, 53));
-    p.setColor(QPalette::ButtonText, Qt::white);
-    p.setColor(QPalette::BrightText, Qt::red);
-    p.setColor(QPalette::Link, QColor(42, 130, 218));
-    p.setColor(QPalette::Highlight, QColor(66, 165, 245));
-    p.setColor(QPalette::HighlightedText, Qt::black);
-    qApp->setPalette(p);
 }
 
 void MainWindow::setupUi() {
     resize(1100, 700);
-    setWindowTitle("Syslog Kit - C++20 Qt6");
+    setWindowTitle("SyslogKit");
 
     auto* central = new QWidget(this);
     setCentralWidget(central);
