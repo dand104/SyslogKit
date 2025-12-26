@@ -46,7 +46,6 @@ private slots:
 
 private:
     void setupUi();
-    void setupTheme();
 
     SyslogKit::Server server_;
     SyslogKit::LogStorage storage_;

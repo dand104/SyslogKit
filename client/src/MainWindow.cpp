@@ -75,10 +75,7 @@ void SyslogModel::clear() {
     endResetModel();
 }
 
-// --- Main Window ---
-
 MainWindow::MainWindow() {
-    setupTheme();
     setupUi();
 
     const QString dbDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -107,9 +104,6 @@ MainWindow::MainWindow() {
 
 MainWindow::~MainWindow() {
     server_.stop();
-}
-
-void MainWindow::setupTheme() {
 }
 
 void MainWindow::setupUi() {
