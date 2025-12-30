@@ -13,12 +13,58 @@
 #include <QDir>
 #include <QApplication>
 #include <QDateTime>
+#include <QTextEdit>
+#include <QDialog>
+#include <QFormLayout>
+#include <QComboBox>
+#include <QSpinBox>
+#include <QGroupBox>
 
+class LogDetailDialog : public QDialog {
+public:
+    explicit LogDetailDialog(const SyslogKit::SyslogMessage& msg, QWidget* parent = nullptr) : QDialog(parent) {
+        setWindowTitle("Log Details");
+        resize(600, 400);
+        auto* lay = new QVBoxLayout(this);
+        auto* form = new QFormLayout();
+
+        auto addRow = [&](const QString& label, const QString& val) {
+            auto* le = new QLineEdit(val);
+            le->setReadOnly(true);
+            form->addRow(label + ":", le);
+        };
+
+        addRow("Timestamp", QString::fromStdString(msg.timestamp));
+        addRow("Hostname", QString::fromStdString(msg.hostname));
+        addRow("App Name", QString::fromStdString(msg.app_name));
+        addRow("Facility", QString::number((int)msg.facility));
+        addRow("Severity", QString::number((int)msg.severity));
+
+        lay->addLayout(form);
+
+        lay->addWidget(new QLabel("Message:"));
+        auto* textEdit = new QTextEdit();
+        textEdit->setPlainText(QString::fromStdString(msg.message));
+        textEdit->setReadOnly(true);
+        lay->addWidget(textEdit);
+
+        auto* closeBtn = new QPushButton("Close");
+        connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
+        lay->addWidget(closeBtn, 0, Qt::AlignRight);
+    }
+};
 
 SyslogModel::SyslogModel(QObject* p) : QAbstractTableModel(p) {}
 
 int SyslogModel::rowCount(const QModelIndex&) const { return static_cast<int>(data_.size()); }
 int SyslogModel::columnCount(const QModelIndex&) const { return 6; }
+
+const SyslogKit::SyslogMessage* SyslogModel::getItem(int row) const {
+    if (row >= 0 && row < static_cast<int>(data_.size())) {
+        return &data_[row];
+    }
+    return nullptr;
+}
 
 QVariant SyslogModel::data(const QModelIndex& idx, const int role) const {
     if (idx.row() >= data_.size()) return {};
@@ -75,15 +121,17 @@ void SyslogModel::clear() {
     endResetModel();
 }
 
-MainWindow::MainWindow() {
+MainWindow::MainWindow() : settings_("SyslogKit", "SyslogKit") {
     setupUi();
 
-    const QString dbDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString dbDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(dbDir);
-    const std::string dbPath = (dbDir + "/SyslogKit_Local.db").toStdString();
+    std::string dbPath = (dbDir + "/SyslogKit_Local.db").toStdString();
 
     if (!storage_.open(dbPath)) {
-        QMessageBox::critical(this, "Error", "Failed to open database!");
+        QMessageBox::critical(this, "Error", "Failed to open default database!");
+    } else {
+        currentDbLbl_->setText("DB: " + QString::fromStdString(dbPath));
     }
 
     connect(this, &MainWindow::logReceived, this, &MainWindow::onLogReceived);
@@ -114,27 +162,28 @@ void MainWindow::setupUi() {
     setCentralWidget(central);
     auto* mainLay = new QVBoxLayout(central);
 
-    auto* tabs = new QTabWidget();
-    mainLay->addWidget(tabs);
+    tabs_ = new QTabWidget();
+    connect(tabs_, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
+    mainLay->addWidget(tabs_);
 
     auto* liveTab = new QWidget();
     auto* liveLay = new QVBoxLayout(liveTab);
 
     auto* topBar = new QHBoxLayout();
-    btnStart_ = new QPushButton("Start Server (5140)");
+    btnStart_ = new QPushButton("Start Server");
     btnStart_->setCheckable(true);
-    btnStart_->setStyleSheet("QPushButton:checked { background-color: #EF5350; }");
+    btnStart_->setStyleSheet("QPushButton:checked { background-color: #EF5350; color: white; }");
     connect(btnStart_, &QPushButton::clicked, this, &MainWindow::onToggleServer);
 
     statusLbl_ = new QLabel("Stopped");
     statusLbl_->setStyleSheet("color: gray; font-weight: bold;");
 
+    auto* btnClear = new QPushButton("Clear View");
+    connect(btnClear, &QPushButton::clicked, [this](){ liveModel_->clear(); });
+
     topBar->addWidget(btnStart_);
     topBar->addWidget(statusLbl_);
     topBar->addStretch();
-
-    auto* btnClear = new QPushButton("Clear");
-    connect(btnClear, &QPushButton::clicked, [this](){ liveModel_->clear(); });
     topBar->addWidget(btnClear);
 
     liveView_ = new QTableView();
@@ -142,40 +191,125 @@ void MainWindow::setupUi() {
     liveView_->setModel(liveModel_);
     liveView_->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Stretch);
     liveView_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    liveView_->setAlternatingRowColors(true);
     liveView_->verticalHeader()->setVisible(false);
     liveView_->setShowGrid(false);
+    connect(liveView_, &QTableView::doubleClicked, this, &MainWindow::onTableDoubleClicked);
 
     liveLay->addLayout(topBar);
     liveLay->addWidget(liveView_);
-    tabs->addTab(liveTab, "Live Monitor");
+    tabs_->addTab(liveTab, "Live Monitor");
 
     auto* dbTab = new QWidget();
     auto* dbLay = new QVBoxLayout(dbTab);
 
+    auto* dbToolsBar = new QHBoxLayout();
+
+    auto* btnSwitchDb = new QPushButton("Open/Switch DB");
+    connect(btnSwitchDb, &QPushButton::clicked, this, &MainWindow::onSwitchDb);
+    auto* btnExportDb = new QPushButton("Export DB File");
+    connect(btnExportDb, &QPushButton::clicked, this, &MainWindow::onExportDb);
+
+    currentDbLbl_ = new QLabel("DB: <none>");
+    currentDbLbl_->setStyleSheet("color: #555; font-size: 10px;");
+
+    dbToolsBar->addWidget(new QLabel("Database:"));
+    dbToolsBar->addWidget(btnSwitchDb);
+    dbToolsBar->addWidget(btnExportDb);
+    dbToolsBar->addStretch();
+    dbToolsBar->addWidget(currentDbLbl_);
+
     auto* filterBar = new QHBoxLayout();
     searchEdit_ = new QLineEdit();
-    searchEdit_->setPlaceholderText("Filter by message content...");
-    auto* btnSearch = new QPushButton("Search");
+    searchEdit_->setPlaceholderText("Search message...");
+    connect(searchEdit_, &QLineEdit::returnPressed, this, &MainWindow::onRefreshDb);
+
+    limitCombo_ = new QComboBox();
+    limitCombo_->addItem("Show: 20", 20);
+    limitCombo_->addItem("Show: 50", 50);
+    limitCombo_->addItem("Show: 100", 100);
+    limitCombo_->addItem("Show: 500", 500);
+    limitCombo_->addItem("Show: All", 0);
+    limitCombo_->setCurrentIndex(1); // Default 50
+    connect(limitCombo_, &QComboBox::currentIndexChanged, this, &MainWindow::onRefreshDb);
+
+    auto* btnSearch = new QPushButton("Refresh / Search");
     connect(btnSearch, &QPushButton::clicked, this, &MainWindow::onRefreshDb);
-    auto* btnExport = new QPushButton("Export");
-    connect(btnExport, &QPushButton::clicked, this, &MainWindow::onExport);
+
+    auto* btnExportLogs = new QPushButton("Export Logs (.log)");
+    connect(btnExportLogs, &QPushButton::clicked, this, &MainWindow::onExportLogs);
 
     filterBar->addWidget(searchEdit_);
+    filterBar->addWidget(limitCombo_);
     filterBar->addWidget(btnSearch);
-    filterBar->addWidget(btnExport);
+    filterBar->addWidget(btnExportLogs);
 
     dbView_ = new QTableView();
     dbModel_ = new SyslogModel(this);
     dbView_->setModel(dbModel_);
     dbView_->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Stretch);
     dbView_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    dbView_->setAlternatingRowColors(true);
     dbView_->verticalHeader()->setVisible(false);
+    connect(dbView_, &QTableView::doubleClicked, this, &MainWindow::onTableDoubleClicked);
 
+    dbLay->addLayout(dbToolsBar);
     dbLay->addLayout(filterBar);
     dbLay->addWidget(dbView_);
-    tabs->addTab(dbTab, "History (SQLite)");
+    tabs_->addTab(dbTab, "Database");
+
+    auto* setTab = new QWidget();
+    auto* setLay = new QVBoxLayout(setTab);
+
+    auto* grpServer = new QGroupBox("Server Settings");
+    auto* srvLay = new QFormLayout(grpServer);
+    portSpin_ = new QSpinBox();
+    portSpin_->setRange(1, 65535);
+    portSpin_->setValue(5140);
+    srvLay->addRow("UDP/TCP Port:", portSpin_);
+
+    auto* grpGui = new QGroupBox("Interface Settings");
+    auto* guiLay = new QFormLayout(grpGui);
+    defaultLimitCombo_ = new QComboBox();
+    defaultLimitCombo_->addItem("20", 20);
+    defaultLimitCombo_->addItem("50", 50);
+    defaultLimitCombo_->addItem("100", 100);
+    guiLay->addRow("Default DB View Limit:", defaultLimitCombo_);
+
+    auto* btnSaveSet = new QPushButton("Save Settings");
+    connect(btnSaveSet, &QPushButton::clicked, this, &MainWindow::onSaveSettings);
+
+    setLay->addWidget(grpServer);
+    setLay->addWidget(grpGui);
+    setLay->addWidget(btnSaveSet);
+    setLay->addStretch();
+
+    tabs_->addTab(setTab, "Settings");
+}
+void MainWindow::loadSettings() const
+{
+    const int port = settings_.value("server/port", 5140).toInt();
+    portSpin_->setValue(port);
+
+    const int defLimit = settings_.value("gui/db_limit", 50).toInt();
+    int idx = defaultLimitCombo_->findData(defLimit);
+    if (idx >= 0) defaultLimitCombo_->setCurrentIndex(idx);
+
+    idx = limitCombo_->findData(defLimit);
+    if (idx >= 0) limitCombo_->setCurrentIndex(idx);
 }
 
+void MainWindow::onSaveSettings() {
+    settings_.setValue("server/port", portSpin_->value());
+    settings_.setValue("gui/db_limit", defaultLimitCombo_->currentData().toInt());
+    QMessageBox::information(this, "Settings", "Settings saved. Restart server to apply port changes.");
+}
+
+void MainWindow::onTabChanged(const int index) {
+    if (index == 1) {
+        onRefreshDb();
+    }
+}
 void MainWindow::onToggleServer() {
     if (isRunning_) {
         server_.stop();
@@ -214,12 +348,12 @@ void MainWindow::onLogReceived(const QString &fac, const QString &sev, const QSt
 void MainWindow::onRefreshDb() {
     SyslogKit::LogFilter filter;
     filter.search_text = searchEdit_->text().toStdString();
-    auto logs = storage_.query(filter);
+    const auto logs = storage_.query(filter);
     dbModel_->set(logs);
 }
 
-void MainWindow::onExport() {
-    QString path = QFileDialog::getSaveFileName(this, "Export", "", "Log File (*.log)");
+void MainWindow::onExportLogs() {
+    const QString path = QFileDialog::getSaveFileName(this, "Export Logs", "", "Log File (*.log)");
     if (path.isEmpty()) return;
 
     QFile f(path);
@@ -230,5 +364,55 @@ void MainWindow::onExport() {
                 << QString::fromStdString(m.hostname) << "\t"
                 << QString::fromStdString(m.message) << "\n";
         }
+        QMessageBox::information(this, "Success", "Logs exported successfully.");
+    } else {
+        QMessageBox::warning(this, "Error", "Could not write to file.");
     }
+}
+
+void MainWindow::onSwitchDb() {
+    const QString path = QFileDialog::getOpenFileName(this, "Open Database", "", "SQLite DB (*.db *.sqlite);;All Files (*)");
+    if (path.isEmpty()) return;
+
+    if (storage_.open(path.toStdString())) {
+        currentDbLbl_->setText("DB: " + path);
+        onRefreshDb();
+        QMessageBox::information(this, "Database", "Switched to new database. New logs will be written here.");
+    } else {
+        QMessageBox::critical(this, "Error", "Failed to open database file.");
+    }
+}
+
+void MainWindow::onExportDb() {
+    if (!storage_.is_open()) {
+        QMessageBox::warning(this, "Warning", "No database is currently open.");
+        return;
+    }
+
+    const QString srcPath = QString::fromStdString(storage_.get_db_path());
+    const QString destPath = QFileDialog::getSaveFileName(this, "Export Database", "backup.db", "SQLite DB (*.db)");
+
+    if (destPath.isEmpty()) return;
+
+    if (QFile src(srcPath); src.copy(destPath)) {
+        QMessageBox::information(this, "Success", "Database exported successfully.");
+    } else {
+        QMessageBox::warning(this, "Error", "Failed to copy database file. Check permissions.");
+    }
+}
+
+void MainWindow::onTableDoubleClicked(const QModelIndex &index) {const SyslogModel* model = nullptr;
+    if (sender() == liveView_) model = liveModel_;
+    else if (sender() == dbView_) model = dbModel_;
+
+    if (model) {
+        if (const auto* item = model->getItem(index.row())) {
+            showDetailDialog(*item);
+        }
+    }
+}
+
+void MainWindow::showDetailDialog(const SyslogKit::SyslogMessage& msg) {
+    LogDetailDialog dlg(msg, this);
+    dlg.exec();
 }

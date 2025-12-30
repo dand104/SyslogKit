@@ -2,6 +2,7 @@
 
 #include <QMainWindow>
 #include <QAbstractTableModel>
+#include <QSettings>
 #include <vector>
 #include "SyslogKit/SyslogServer"
 #include "SyslogKit/LogStorage"
@@ -10,6 +11,9 @@ class QTableView;
 class QLabel;
 class QPushButton;
 class QLineEdit;
+class QTabWidget;
+class QComboBox;
+class QSpinBox;
 
 class SyslogModel : public QAbstractTableModel {
     Q_OBJECT
@@ -24,6 +28,7 @@ public:
     void set(const std::vector<SyslogKit::SyslogMessage>& msgs);
     void clear();
     [[nodiscard]] const std::vector<SyslogKit::SyslogMessage>& items() const { return data_; }
+    [[nodiscard]] const SyslogKit::SyslogMessage* getItem(int row) const;
 
 private:
     std::vector<SyslogKit::SyslogMessage> data_;
@@ -42,20 +47,35 @@ private slots:
     void onToggleServer();
     void onLogReceived(const QString &fac, const QString &sev, const QString &host, const QString &app, const QString &msg, const QString &time) const;
     void onRefreshDb();
-    void onExport();
-
+    void onExportLogs();    // Экспорт в .log (текст)
+    void onExportDb();      // Экспорт .db файла
+    void onSwitchDb();      // Сменить текущий .db (Import)
+    void onTabChanged(int index);
+    void onTableDoubleClicked(const QModelIndex &index);
+    void onSaveSettings();
 private:
     void setupUi();
+    void loadSettings() const;
+    void showDetailDialog(const SyslogKit::SyslogMessage& msg);
 
     SyslogKit::Server server_;
     SyslogKit::LogStorage storage_;
+    QSettings settings_;
     bool isRunning_ = false;
 
+    QTabWidget* tabs_{};
     SyslogModel* liveModel_{};
     SyslogModel* dbModel_{};
     QTableView* liveView_{};
     QTableView* dbView_{};
+
     QPushButton* btnStart_{};
     QLabel* statusLbl_{};
+
     QLineEdit* searchEdit_{};
+    QComboBox* limitCombo_{};
+    QLabel* currentDbLbl_{};
+
+    QSpinBox* portSpin_{};
+    QComboBox* defaultLimitCombo_{};
 };

@@ -15,13 +15,20 @@ namespace SyslogKit {
     }
 
     bool LogStorage::open(const std::string& path) {
+        close(); // сlose previous if open
         if (sqlite3_open(path.c_str(), &db_) != SQLITE_OK) return false;
+
+        db_path_ = path;
         init_table();
+
+        sqlite3_exec(db_, "PRAGMA synchronous = NORMAL;", nullptr, nullptr, nullptr);
+        sqlite3_exec(db_, "PRAGMA journal_mode = WAL;", nullptr, nullptr, nullptr);
+
         return true;
     }
 
     void LogStorage::init_table() {
-        const char* sql = R"(
+        const auto sql = R"(
             CREATE TABLE IF NOT EXISTS logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 fac INTEGER, sev INTEGER,
@@ -29,12 +36,16 @@ namespace SyslogKit {
             );
             CREATE INDEX IF NOT EXISTS idx_ts ON logs(ts);
         )";
-        sqlite3_exec(db_, sql, nullptr, nullptr, nullptr);
+        char* errMsg = nullptr;
+        sqlite3_exec(db_, sql, nullptr, nullptr, &errMsg);
+        if (errMsg) {
+            sqlite3_free(errMsg);
+        }
     }
 
     bool LogStorage::write(const SyslogMessage& msg) {
         if (!db_) return false;
-        const char* sql = "INSERT INTO logs (fac, sev, ts, host, app, msg) VALUES (?,?,?,?,?,?)";
+        const auto sql = "INSERT INTO logs (fac, sev, ts, host, app, msg) VALUES (?,?,?,?,?,?)";
         sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
 
@@ -56,8 +67,11 @@ namespace SyslogKit {
 
         std::string sql = "SELECT fac, sev, ts, host, app, msg FROM logs WHERE 1=1";
         if (!filter.search_text.empty()) sql += " AND msg LIKE ?";
-        sql += " ORDER BY id DESC LIMIT ?";
+        sql += " ORDER BY id DESC";
 
+        if (filter.limit > 0) {
+            sql += " LIMIT ?";
+        }
         sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return res;
 

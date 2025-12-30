@@ -9,8 +9,8 @@ namespace SyslogKit {
 
     struct LogFilter {
         std::string search_text;
-        int min_severity = -1; // -1 = все
-        int limit = 1000;
+        int min_severity = -1;
+        int limit = 50;
     };
 
     class LogStorage {
@@ -23,8 +23,12 @@ namespace SyslogKit {
         bool write(const SyslogMessage& msg);
         std::vector<SyslogMessage> query(const LogFilter& filter);
 
+        [[nodiscard]] std::string get_db_path() const { return db_path_; }
+        [[nodiscard]] bool is_open() const { return db_ != nullptr; }
+
     private:
         void init_table();
         sqlite3* db_ = nullptr;
+        std::string db_path_;
     };
 }
