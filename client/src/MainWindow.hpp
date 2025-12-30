@@ -14,6 +14,7 @@ class QLineEdit;
 class QTabWidget;
 class QComboBox;
 class QSpinBox;
+class QCheckBox;
 
 class SyslogModel : public QAbstractTableModel {
     Q_OBJECT
@@ -53,6 +54,7 @@ private slots:
     void onTabChanged(int index);
     void onTableDoubleClicked(const QModelIndex &index);
     void onSaveSettings();
+    void onRestoreDefaults();
 private:
     void setupUi();
     void loadSettings() const;
@@ -77,5 +79,7 @@ private:
     QLabel* currentDbLbl_{};
 
     QSpinBox* portSpin_{};
+    QCheckBox* chkUdp_{};
+    QCheckBox* chkTcp_{};
     QComboBox* defaultLimitCombo_{};
 };

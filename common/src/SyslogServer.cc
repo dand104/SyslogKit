@@ -40,7 +40,7 @@ namespace SyslogKit {
     Server::~Server() { stop(); }
 
     void Server::start(uint16_t port, const bool udp, const bool tcp) {
-        if (running_) return;
+        if (running_) stop();
         running_ = true;
         if (udp) udp_thread_ = std::jthread(&Server::udp_loop, this, port);
         if (tcp) tcp_thread_ = std::jthread(&Server::tcp_loop, this, port);
@@ -57,6 +57,8 @@ namespace SyslogKit {
         addr.sin_port = htons(port);
         addr.sin_addr.s_addr = INADDR_ANY;
 
+        int opt = 1;
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
         if (bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
             CLOSE_SOCK(fd); return;
         }
@@ -66,14 +68,14 @@ namespace SyslogKit {
         char buf[2048];
         while (running_) {
             fd_set fds; FD_ZERO(&fds); FD_SET(fd, &fds);
-            timeval tv{0, 500000}; // 500ms
+            timeval tv{0, 50000};
             if (select(static_cast<int>(fd) + 1, &fds, nullptr, nullptr, &tv) > 0) {
                 sockaddr_in cli{};
                 socklen_t len = sizeof(cli);
-                const int n = recvfrom(fd, buf, sizeof(buf)-1, 0, reinterpret_cast<sockaddr *>(&cli), &len);
+                const int n = recvfrom(fd, buf, sizeof(buf), 0, reinterpret_cast<sockaddr *>(&cli), &len);
+
                 if (n > 0) {
-                    buf[n] = 0;
-                    auto msg = SyslogBuilder::parse(buf);
+                    auto msg = SyslogBuilder::parse(std::string_view(buf, static_cast<size_t>(n)));
                     if(msg.hostname.empty()) {
                         char ip[64];
                         inet_ntop(AF_INET, &cli.sin_addr, ip, 64);
@@ -100,17 +102,15 @@ namespace SyslogKit {
 
         while (running_) {
             fd_set fds; FD_ZERO(&fds); FD_SET(fd, &fds);
-            timeval tv{0, 500000};
+            timeval tv{0, 50000};
             if (select(static_cast<int>(fd) + 1, &fds, 0, 0, &tv) > 0) {
                 sockaddr_in cli{};
                 socklen_t len = sizeof(cli);
                 const sock_t client = accept(fd, reinterpret_cast<sockaddr *>(&cli), &len);
                 if (client != INVALID_SOCK) {
                     char buf[4096];
-                    const int n = recv(client, buf, sizeof(buf)-1, 0);
-                    if (n > 0) {
-                        buf[n] = 0;
-                        auto msg = SyslogBuilder::parse(buf);
+                    if (const int n = recv(client, buf, sizeof(buf), 0); n > 0) {
+                        auto msg = SyslogBuilder::parse(std::string_view(buf, static_cast<size_t>(n)));
                         if(msg.hostname.empty()) {
                             char ip[64];
                             inet_ntop(AF_INET, &cli.sin_addr, ip, 64);

@@ -19,6 +19,7 @@
 #include <QComboBox>
 #include <QSpinBox>
 #include <QGroupBox>
+#include <QCheckBox>
 
 class LogDetailDialog : public QDialog {
 public:
@@ -37,8 +38,8 @@ public:
         addRow("Timestamp", QString::fromStdString(msg.timestamp));
         addRow("Hostname", QString::fromStdString(msg.hostname));
         addRow("App Name", QString::fromStdString(msg.app_name));
-        addRow("Facility", QString::number((int)msg.facility));
-        addRow("Severity", QString::number((int)msg.severity));
+        addRow("Facility", QString::number(static_cast<int>(msg.facility)));
+        addRow("Severity", QString::number(static_cast<int>(msg.severity)));
 
         lay->addLayout(form);
 
@@ -121,10 +122,9 @@ void SyslogModel::clear() {
     endResetModel();
 }
 
-MainWindow::MainWindow() : settings_("SyslogKit", "SyslogKit") {
+MainWindow::MainWindow() : settings_() {
     setupUi();
-
-    QString dbDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString dbDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(dbDir);
     std::string dbPath = (dbDir + "/SyslogKit_Local.db").toStdString();
 
@@ -136,7 +136,7 @@ MainWindow::MainWindow() : settings_("SyslogKit", "SyslogKit") {
 
     connect(this, &MainWindow::logReceived, this, &MainWindow::onLogReceived);
 
-    server_.set_callback([this](SyslogKit::SyslogMessage msg) {
+    server_.set_callback([this](SyslogKit::SyslogMessage const& msg) {
         storage_.write(msg);
 
         emit logReceived(
@@ -148,6 +148,7 @@ MainWindow::MainWindow() : settings_("SyslogKit", "SyslogKit") {
             QString::fromStdString(msg.timestamp)
         );
     });
+    loadSettings();
 }
 
 MainWindow::~MainWindow() {
@@ -268,6 +269,17 @@ void MainWindow::setupUi() {
     portSpin_->setValue(5140);
     srvLay->addRow("UDP/TCP Port:", portSpin_);
 
+    auto* protoLay = new QHBoxLayout();
+    chkUdp_ = new QCheckBox("Enable UDP");
+    chkUdp_->setChecked(true);
+    chkTcp_ = new QCheckBox("Enable TCP");
+    chkTcp_->setChecked(true);
+    protoLay->addWidget(chkUdp_);
+    protoLay->addWidget(chkTcp_);
+    protoLay->addStretch();
+
+    srvLay->addRow("Protocols:", protoLay);
+
     auto* grpGui = new QGroupBox("Interface Settings");
     auto* guiLay = new QFormLayout(grpGui);
     defaultLimitCombo_ = new QComboBox();
@@ -276,12 +288,20 @@ void MainWindow::setupUi() {
     defaultLimitCombo_->addItem("100", 100);
     guiLay->addRow("Default DB View Limit:", defaultLimitCombo_);
 
+    auto* btnLay = new QHBoxLayout();
     auto* btnSaveSet = new QPushButton("Save Settings");
     connect(btnSaveSet, &QPushButton::clicked, this, &MainWindow::onSaveSettings);
 
+    auto* btnRestore = new QPushButton("Restore Defaults");
+    connect(btnRestore, &QPushButton::clicked, this, &MainWindow::onRestoreDefaults);
+
+    btnLay->addWidget(btnSaveSet);
+    btnLay->addWidget(btnRestore);
+    btnLay->addStretch();
+
     setLay->addWidget(grpServer);
     setLay->addWidget(grpGui);
-    setLay->addWidget(btnSaveSet);
+    setLay->addLayout(btnLay);
     setLay->addStretch();
 
     tabs_->addTab(setTab, "Settings");
@@ -290,6 +310,11 @@ void MainWindow::loadSettings() const
 {
     const int port = settings_.value("server/port", 5140).toInt();
     portSpin_->setValue(port);
+
+    const bool udp = settings_.value("server/udp_enabled", true).toBool();
+    const bool tcp = settings_.value("server/tcp_enabled", true).toBool();
+    chkUdp_->setChecked(udp);
+    chkTcp_->setChecked(tcp);
 
     const int defLimit = settings_.value("gui/db_limit", 50).toInt();
     int idx = defaultLimitCombo_->findData(defLimit);
@@ -301,7 +326,14 @@ void MainWindow::loadSettings() const
 
 void MainWindow::onSaveSettings() {
     settings_.setValue("server/port", portSpin_->value());
+    settings_.setValue("server/udp_enabled", chkUdp_->isChecked());
+    settings_.setValue("server/tcp_enabled", chkTcp_->isChecked());
     settings_.setValue("gui/db_limit", defaultLimitCombo_->currentData().toInt());
+    settings_.sync();
+
+    int idx = limitCombo_->findData(defaultLimitCombo_->currentData().toInt());
+    if (idx >= 0) limitCombo_->setCurrentIndex(idx);
+
     QMessageBox::information(this, "Settings", "Settings saved. Restart server to apply port changes.");
 }
 
@@ -315,18 +347,33 @@ void MainWindow::onToggleServer() {
         server_.stop();
         statusLbl_->setText("Stopped");
         statusLbl_->setStyleSheet("color: gray; font-weight: bold;");
-        btnStart_->setText("Start Server (5140)");
+        const int port = portSpin_->value();
+        btnStart_->setText(QString("Start Server (%1)").arg(port));
         isRunning_ = false;
     } else {
+        const int port = portSpin_->value();
+        const bool useUdp = chkUdp_->isChecked();
+        const bool useTcp = chkTcp_->isChecked();
+
+        if (!useUdp && !useTcp) {
+            QMessageBox::warning(this, "Error", "Please enable at least one protocol (UDP or TCP) in settings.");
+            btnStart_->setChecked(false);
+            return;
+        }
+
         try {
-            // Используем порт 5140, чтобы не требовать права рута/админа
-            server_.start(5140, true, true);
-            statusLbl_->setText("Running UDP/TCP :5140");
+            server_.start(static_cast<uint16_t>(port), useUdp, useTcp);
+
+            QStringList protos;
+            if (useUdp) protos << "UDP";
+            if (useTcp) protos << "TCP";
+
+            statusLbl_->setText(QString("Running %1 :%2").arg(protos.join("/")).arg(port));
             statusLbl_->setStyleSheet("color: #66BB6A; font-weight: bold;");
             btnStart_->setText("Stop Server");
             isRunning_ = true;
         } catch (...) {
-            QMessageBox::warning(this, "Error", "Could not bind port.");
+            QMessageBox::warning(this, "Error", "Could not bind port " + QString::number(port));
             btnStart_->setChecked(false);
         }
     }
@@ -415,4 +462,15 @@ void MainWindow::onTableDoubleClicked(const QModelIndex &index) {const SyslogMod
 void MainWindow::showDetailDialog(const SyslogKit::SyslogMessage& msg) {
     LogDetailDialog dlg(msg, this);
     dlg.exec();
+}
+
+void MainWindow::onRestoreDefaults() {
+    if (QMessageBox::question(this, "Confirm", "Reset all settings to default values?") == QMessageBox::Yes) {
+        portSpin_->setValue(5140);
+        chkUdp_->setChecked(true);
+        chkTcp_->setChecked(true);
+        defaultLimitCombo_->setCurrentIndex(1);
+
+        onSaveSettings();
+    }
 }
