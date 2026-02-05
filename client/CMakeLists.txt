@@ -10,6 +10,11 @@ add_executable(SyslogKit
         src/MainWindow.hpp
 )
 
+set_target_properties(SyslogKit PROPERTIES
+        WIN32_EXECUTABLE ON
+        MACOSX_BUNDLE ON
+)
+
 target_link_libraries(SyslogKit PRIVATE
         Qt${QT_VERSION_MAJOR}::Widgets
         Qt${QT_VERSION_MAJOR}::Network
