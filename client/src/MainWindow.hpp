@@ -4,8 +4,8 @@
 #include <QAbstractTableModel>
 #include <QSettings>
 #include <vector>
-#include "SyslogKit/SyslogServer"
-#include "SyslogKit/LogStorage"
+#include "SyslogKit/SyslogServer.hxx"
+#include "SyslogKit/LogStorage.hxx"
 
 class QTableView;
 class QLabel;

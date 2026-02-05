@@ -9,9 +9,9 @@ add_library(syslogkitbase STATIC
         src/SyslogProto.cc
         src/SyslogServer.cc
         src/LogStorage.cc
-        inc/SyslogKit/SyslogProto
-        inc/SyslogKit/SyslogServer
-        inc/SyslogKit/LogStorage
+        inc/SyslogKit/SyslogProto.hxx
+        inc/SyslogKit/SyslogServer.hxx
+        inc/SyslogKit/LogStorage.hxx
         ${SQLITE_SOURCES}
 )
 

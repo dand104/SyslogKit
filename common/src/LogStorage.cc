@@ -1,4 +1,4 @@
-#include "SyslogKit/LogStorage"
+#include "SyslogKit/LogStorage.hxx"
 #include <sqlite3.h>
 #include <iostream>
 

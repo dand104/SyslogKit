@@ -1,5 +1,5 @@
 #pragma once
-#include "SyslogProto"
+#include "SyslogProto.hxx"
 #include <vector>
 #include <string>
 

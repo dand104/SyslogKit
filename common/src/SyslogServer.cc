@@ -1,4 +1,4 @@
-#include "SyslogKit/SyslogServer"
+#include "SyslogKit/SyslogServer.hxx"
 #include <vector>
 #include <iostream>
 

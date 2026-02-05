@@ -1,4 +1,4 @@
-#include "SyslogKit/SyslogProto"
+#include "SyslogKit/SyslogProto.hxx"
 #include <sstream>
 #include <iomanip>
 #include <ctime>

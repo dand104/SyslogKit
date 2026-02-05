@@ -231,7 +231,7 @@ void MainWindow::setupUi() {
     limitCombo_->addItem("Show: 100", 100);
     limitCombo_->addItem("Show: 500", 500);
     limitCombo_->addItem("Show: All", 0);
-    limitCombo_->setCurrentIndex(1); // Default 50
+    limitCombo_->setCurrentIndex(1);
     connect(limitCombo_, &QComboBox::currentIndexChanged, this, &MainWindow::onRefreshDb);
 
     auto* btnSearch = new QPushButton("Refresh / Search");
