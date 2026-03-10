@@ -173,7 +173,6 @@ void MainWindow::setupUi() {
     auto* topBar = new QHBoxLayout();
     btnStart_ = new QPushButton("Start Server");
     btnStart_->setCheckable(true);
-    btnStart_->setStyleSheet("QPushButton:checked { background-color: #EF5350; color: white; }");
     connect(btnStart_, &QPushButton::clicked, this, &MainWindow::onToggleServer);
 
     statusLbl_ = new QLabel("Stopped");
