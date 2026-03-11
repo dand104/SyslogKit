@@ -39,32 +39,56 @@ namespace SyslogKit {
     Server::Server() = default;
     Server::~Server() { stop(); }
 
-    void Server::start(uint16_t port, const bool udp, const bool tcp) {
+    using native_sock_t = sock_t;
+
+    bool Server::start(const uint16_t port, const bool udp, const bool tcp) {
         if (running_) stop();
-        running_ = true;
-        if (udp) udp_thread_ = std::jthread(&Server::udp_loop, this, port);
-        if (tcp) tcp_thread_ = std::jthread(&Server::tcp_loop, this, port);
-    }
 
-    void Server::stop() { running_ = false; }
-
-    void Server::udp_loop(const uint16_t port) {
-        const sock_t fd = socket(AF_INET, SOCK_DGRAM, 0);
-        if (fd == INVALID_SOCK) return;
-
+        auto udp_fd = INVALID_SOCK;
+        auto tcp_fd = INVALID_SOCK;
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
         addr.sin_addr.s_addr = INADDR_ANY;
 
-        int opt = 1;
-        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
-        if (bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
-            CLOSE_SOCK(fd); return;
+        if (udp) {
+            udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (udp_fd == INVALID_SOCK) return false;
+            int opt = 1;
+            setsockopt(udp_fd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
+            if (bind(udp_fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+                CLOSE_SOCK(udp_fd);
+                return false;
+            }
         }
 
-        // For production code, use select() or non-blocking recv
+        if (tcp) {
+            tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+            if (tcp_fd == INVALID_SOCK) {
+                if (udp) CLOSE_SOCK(udp_fd);
+                return false;
+            }
+            int opt = 1;
+            setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
+            if (bind(tcp_fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+                CLOSE_SOCK(tcp_fd);
+                if (udp) CLOSE_SOCK(udp_fd);
+                return false;
+            }
+            listen(tcp_fd, 5);
+        }
 
+        running_ = true;
+        if (udp) udp_thread_ = std::jthread(&Server::udp_loop, this, static_cast<uint64_t>(udp_fd));
+        if (tcp) tcp_thread_ = std::jthread(&Server::tcp_loop, this, static_cast<uint64_t>(tcp_fd));
+
+        return true;
+    }
+
+    void Server::stop() { running_ = false; }
+
+    void Server::udp_loop(const uint64_t raw_fd) const {
+        const auto fd = raw_fd;
         char buf[2048];
         while (running_) {
             fd_set fds; FD_ZERO(&fds); FD_SET(fd, &fds);
@@ -88,18 +112,8 @@ namespace SyslogKit {
         CLOSE_SOCK(fd);
     }
 
-    void Server::tcp_loop(const uint16_t port) {
-        const sock_t fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (fd == INVALID_SOCK) return;
-
-        sockaddr_in addr{};
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(port);
-        addr.sin_addr.s_addr = INADDR_ANY;
-
-        if (bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) { CLOSE_SOCK(fd); return; }
-        listen(fd, 5);
-
+    void Server::tcp_loop(const uint64_t raw_fd) const {
+        const native_sock_t fd = raw_fd;
         while (running_) {
             fd_set fds; FD_ZERO(&fds); FD_SET(fd, &fds);
             timeval tv{0, 50000};

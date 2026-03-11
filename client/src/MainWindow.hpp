@@ -48,9 +48,10 @@ private slots:
     void onToggleServer();
     void onLogReceived(const QString &fac, const QString &sev, const QString &host, const QString &app, const QString &msg, const QString &time) const;
     void onRefreshDb();
-    void onExportLogs();    // Экспорт в .log (текст)
-    void onExportDb();      // Экспорт .db файла
-    void onSwitchDb();      // Сменить текущий .db (Import)
+    void onExportLogs();
+    void onExportDb();
+    void onSwitchDb();
+    void onClearDb();
     void onTabChanged(int index);
     void onTableDoubleClicked(const QModelIndex &index);
     void onSaveSettings();

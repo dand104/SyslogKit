@@ -27,12 +27,13 @@ namespace SyslogKit {
         return true;
     }
 
-    void LogStorage::init_table() {
+    void LogStorage::init_table() const {
         const auto sql = R"(
             CREATE TABLE IF NOT EXISTS logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 fac INTEGER, sev INTEGER,
                 ts TEXT, host TEXT, app TEXT, msg TEXT
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_ts ON logs(ts);
         )";
@@ -43,7 +44,18 @@ namespace SyslogKit {
         }
     }
 
-    bool LogStorage::write(const SyslogMessage& msg) {
+    bool LogStorage::clear_database(const int up_to) const {
+        if (!db_) return false;
+        std::string sql;
+        if (up_to <= 0) {
+            sql = "DELETE FROM logs;";
+        } else {
+            sql = "DELETE FROM logs WHERE created_at <= datetime('now', '-" + std::to_string(up_to) + " days');";
+        }
+        return sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK;
+    }
+
+    bool LogStorage::write(const SyslogMessage& msg) const {
         if (!db_) return false;
         const auto sql = "INSERT INTO logs (fac, sev, ts, host, app, msg) VALUES (?,?,?,?,?,?)";
         sqlite3_stmt* stmt;
@@ -61,7 +73,7 @@ namespace SyslogKit {
         return ok;
     }
 
-    std::vector<SyslogMessage> LogStorage::query(const LogFilter& filter) {
+    std::vector<SyslogMessage> LogStorage::query(const LogFilter& filter) const {
         std::vector<SyslogMessage> res;
         if (!db_) return res;
 

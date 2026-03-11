@@ -26,6 +26,7 @@ public:
     explicit LogDetailDialog(const SyslogKit::SyslogMessage& msg, QWidget* parent = nullptr) : QDialog(parent) {
         setWindowTitle("Log Details");
         resize(600, 400);
+        setAttribute(Qt::WA_DeleteOnClose);
         auto* lay = new QVBoxLayout(this);
         auto* form = new QFormLayout();
 
@@ -236,6 +237,10 @@ void MainWindow::setupUi() {
     auto* btnSearch = new QPushButton("Refresh / Search");
     connect(btnSearch, &QPushButton::clicked, this, &MainWindow::onRefreshDb);
 
+    auto* btnClearDb = new QPushButton("Clear Database");
+    connect(btnClearDb, &QPushButton::clicked, this, &MainWindow::onClearDb);
+    dbToolsBar->addWidget(btnClearDb);
+
     auto* btnExportLogs = new QPushButton("Export Logs (.log)");
     connect(btnExportLogs, &QPushButton::clicked, this, &MainWindow::onExportLogs);
 
@@ -305,8 +310,8 @@ void MainWindow::setupUi() {
 
     tabs_->addTab(setTab, "Settings");
 }
-void MainWindow::loadSettings() const
-{
+
+void MainWindow::loadSettings() const {
     const int port = settings_.value("server/port", 5140).toInt();
     portSpin_->setValue(port);
 
@@ -360,9 +365,7 @@ void MainWindow::onToggleServer() {
             return;
         }
 
-        try {
-            server_.start(static_cast<uint16_t>(port), useUdp, useTcp);
-
+        if (server_.start(static_cast<uint16_t>(port), useUdp, useTcp)) {
             QStringList protos;
             if (useUdp) protos << "UDP";
             if (useTcp) protos << "TCP";
@@ -371,8 +374,10 @@ void MainWindow::onToggleServer() {
             statusLbl_->setStyleSheet("color: #66BB6A; font-weight: bold;");
             btnStart_->setText("Stop Server");
             isRunning_ = true;
-        } catch (...) {
-            QMessageBox::warning(this, "Error", "Could not bind port " + QString::number(port));
+        } else {
+            QMessageBox::critical(this, "Error",
+                "Failed to start server on port " + QString::number(port) +
+                ". Port may be in use by another application or instance.");
             btnStart_->setChecked(false);
         }
     }
@@ -459,8 +464,8 @@ void MainWindow::onTableDoubleClicked(const QModelIndex &index) {const SyslogMod
 }
 
 void MainWindow::showDetailDialog(const SyslogKit::SyslogMessage& msg) {
-    LogDetailDialog dlg(msg, this);
-    dlg.exec();
+    auto* dlg = new LogDetailDialog(msg, this);
+    dlg->show();
 }
 
 void MainWindow::onRestoreDefaults() {
@@ -472,4 +477,32 @@ void MainWindow::onRestoreDefaults() {
 
         onSaveSettings();
     }
+}
+
+void MainWindow::onClearDb() {
+    if (!storage_.is_open()) return;
+
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("Clear Database");
+    msgBox.setText("Select what logs you want to delete:");
+
+    auto const* btnAll = msgBox.addButton("Delete All", QMessageBox::DestructiveRole);
+    auto const* btnMonth = msgBox.addButton("Older than 30 days", QMessageBox::AcceptRole);
+    auto const* btnWeek = msgBox.addButton("Older than 7 days", QMessageBox::AcceptRole);
+    msgBox.addButton(QMessageBox::Cancel);
+
+    msgBox.exec();
+
+    if (msgBox.clickedButton() == btnAll) {
+        storage_.clear_database(0);
+    } else if (msgBox.clickedButton() == btnMonth) {
+        storage_.clear_database(30);
+    } else if (msgBox.clickedButton() == btnWeek) {
+        storage_.clear_database(7);
+    } else {
+        return;
+    }
+
+    QMessageBox::information(this, "Success", "Database cleared successfully.");
+    onRefreshDb();
 }

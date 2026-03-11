@@ -13,13 +13,13 @@ namespace SyslogKit {
         Server();
         ~Server();
 
-        void start(uint16_t port, bool udp, bool tcp);
+        bool start(uint16_t port, bool udp, bool tcp);
         void stop();
-        void set_callback(Callback cb) { callback_ = cb; }
+        void set_callback(Callback const& cb) { callback_ = cb; }
 
     private:
-        void udp_loop(uint16_t port);
-        void tcp_loop(uint16_t port);
+        void udp_loop(uint64_t fd) const;
+        void tcp_loop(uint64_t fd) const;
 
         std::atomic<bool> running_{false};
         std::jthread udp_thread_;
