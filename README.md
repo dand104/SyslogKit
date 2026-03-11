@@ -7,9 +7,15 @@ Simple and portable Syslog server + client
 - Real-time log view
 - Export filtered logs to standard `.log` text files or binary `.db` backups.
 
+## Screenshots
+![preview-main.png](preview-main.png)
+![preview-db.png](preview-db.png)
+![preview-configuration.png](preview-configuration.png)
+
 ## Project Structure
 - `common/`: Core logic, syslog protocol parsing, and SQLite storage implementation.
 - `client/`: Qt-based graphical user interface source code.
+- `sender/`: Utility for testing syslog sending.
 
 ## Building from Source
 
