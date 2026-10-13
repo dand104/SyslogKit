@@ -1,0 +1,25 @@
+namespace SyslogKit
+{
+    [default_interface]
+    runtimeclass LogItem
+    {
+        LogItem(String timestamp, Int32 facility, Int32 severity, String severityName, String hostname, String appName, String message);
+
+        String Timestamp{ get; };
+        Int32 Facility{ get; };
+        Int32 Severity{ get; };
+        String SeverityName{ get; };
+        String Hostname{ get; };
+        String AppName{ get; };
+        String Message{ get; };
+        Microsoft.UI.Xaml.Media.SolidColorBrush SeverityBrush{ get; };
+    }
+
+    [default_interface]
+    runtimeclass MainWindow : Microsoft.UI.Xaml.Window
+    {
+        MainWindow();
+        Windows.Foundation.Collections.IObservableVector<LogItem> LiveLogs{ get; };
+        Windows.Foundation.Collections.IObservableVector<LogItem> DbLogs{ get; };
+    }
+}

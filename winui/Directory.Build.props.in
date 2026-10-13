@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <GeneratedFilesDir>$(MSBuildProjectDirectory)\Generated Files\</GeneratedFilesDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>

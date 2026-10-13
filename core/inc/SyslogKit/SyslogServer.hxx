@@ -22,8 +22,8 @@ namespace SyslogKit {
         void tcp_loop(uint64_t fd) const;
 
         std::atomic<bool> running_{false};
-        std::jthread udp_thread_;
-        std::jthread tcp_thread_;
+        std::thread udp_thread_;
+        std::thread tcp_thread_;
         Callback callback_;
     };
 }

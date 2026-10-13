@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="SyslogKit.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SyslogKit"
+    Title="SyslogKit">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="BaseAlt" />
+    </Window.SystemBackdrop>
+
+    <Grid Background="Transparent" RowDefinitions="Auto,*">
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="40" Background="Transparent">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" Spacing="10">
+                <FontIcon Glyph="&#xE756;" FontSize="15" Foreground="{ThemeResource AccentAAFillColorDefaultBrush}"/>
+                <TextBlock Text="SyslogKit" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+
+        <NavigationView x:Name="NavView"
+                        Grid.Row="1"
+                        PaneDisplayMode="Top"
+                        IsBackButtonVisible="Collapsed"
+                        SelectionChanged="OnNavSelectionChanged"
+                        Background="Transparent">
+
+            <NavigationView.Resources>
+                <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewDefaultContentBackground" Color="Transparent" />
+            </NavigationView.Resources>
+
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Live Monitor" Tag="live" Icon="FourBars" />
+                <NavigationViewItem Content="Database" Tag="db" Icon="Library" />
+            </NavigationView.MenuItems>
+
+            <Grid Margin="16,8,16,16">
+                <Grid x:Name="LiveTabContent" RowDefinitions="Auto,Auto,*">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+                        <Button x:Name="BtnStartServer" Content="Start Server" Click="OnToggleServerClicked" Style="{ThemeResource AccentButtonStyle}"/>
+                        <TextBlock x:Name="TxtServerStatus" Text="Stopped" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="Gray"/>
+                        <Button Content="Clear View" Click="OnClearLiveViewClicked"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="4,4,0,0" Padding="12,8">
+                        <Grid ColumnDefinitions="140,45,65,120,110,*">
+                            <TextBlock Grid.Column="0" Text="Time" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="1" Text="Fac" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="2" Text="Sev" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="3" Text="Host" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="4" Text="App" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="5" Text="Message" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <ListView x:Name="LiveListView" Grid.Row="2" ItemsSource="{x:Bind LiveLogs}" DoubleTapped="OnLogDoubleTapped" SelectionMode="Single">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:LogItem">
+                                <Grid ColumnDefinitions="140,45,65,120,110,*">
+                                    <TextBlock Grid.Column="0" Text="{x:Bind Timestamp}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Facility}" Foreground="{x:Bind SeverityBrush}"/>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind SeverityName}" Foreground="{x:Bind SeverityBrush}"/>
+                                    <TextBlock Grid.Column="3" Text="{x:Bind Hostname}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="4" Text="{x:Bind AppName}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="5" Text="{x:Bind Message}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+
+                <Grid x:Name="DbTabContent" Visibility="Collapsed" RowDefinitions="Auto,Auto,Auto,*">
+                    <Grid Grid.Row="0" Margin="0,0,0,10" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                            <Button Content="Open/Switch DB" Click="OnSwitchDbClicked"/>
+                            <Button Content="Export DB File" Click="OnExportDbClicked"/>
+                            <Button Content="Clear Database" Click="OnClearDbClicked"/>
+                        </StackPanel>
+                        <Border Grid.Column="4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Padding="10,5" CornerRadius="4">
+                            <TextBlock x:Name="TxtCurrentDb" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="250" Text="DB: &lt;none&gt;"/>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,12" ColumnDefinitions="*,Auto,Auto,Auto">
+                        <TextBox x:Name="SearchBox" Grid.Column="0" PlaceholderText="Search message..." KeyDown="OnSearchKeyDown" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="LimitComboBox" Grid.Column="1" Width="120" SelectionChanged="OnLimitSelectionChanged" Margin="0,0,8,0">
+                            <ComboBoxItem Content="Show: 20" Tag="20"/>
+                            <ComboBoxItem Content="Show: 50" Tag="50" IsSelected="True"/>
+                            <ComboBoxItem Content="Show: 100" Tag="100"/>
+                            <ComboBoxItem Content="Show: 500" Tag="500"/>
+                            <ComboBoxItem Content="Show: All" Tag="0"/>
+                        </ComboBox>
+                        <Button Grid.Column="2" Content="Search / Refresh" Click="OnRefreshDbClicked" Margin="0,0,8,0"/>
+                        <Button Grid.Column="3" Content="Export (.log)" Click="OnExportLogsClicked"/>
+                    </Grid>
+
+                    <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="4,4,0,0" Padding="12,8">
+                        <Grid ColumnDefinitions="140,45,65,120,110,*">
+                            <TextBlock Grid.Column="0" Text="Time" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="1" Text="Fac" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="2" Text="Sev" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="3" Text="Host" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="4" Text="App" FontWeight="Bold"/>
+                            <TextBlock Grid.Column="5" Text="Message" FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+
+                    <ListView x:Name="DbListView" Grid.Row="3" ItemsSource="{x:Bind DbLogs}" DoubleTapped="OnLogDoubleTapped" SelectionMode="Single">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:LogItem">
+                                <Grid ColumnDefinitions="140,45,65,120,110,*">
+                                    <TextBlock Grid.Column="0" Text="{x:Bind Timestamp}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Facility}" Foreground="{x:Bind SeverityBrush}"/>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind SeverityName}" Foreground="{x:Bind SeverityBrush}"/>
+                                    <TextBlock Grid.Column="3" Text="{x:Bind Hostname}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="4" Text="{x:Bind AppName}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="5" Text="{x:Bind Message}" Foreground="{x:Bind SeverityBrush}" TextTrimming="CharacterEllipsis"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+
+                <ScrollViewer x:Name="SettingsTabContent" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="16" MaxWidth="500" HorizontalAlignment="Left" Margin="0,4,0,24">
+                        <TextBlock Text="Server Settings" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                        <NumberBox x:Name="PortNumberBox" Header="UDP/TCP Port" Value="5140" SpinButtonPlacementMode="Inline" Minimum="1" Maximum="65535"/>
+                        <StackPanel Orientation="Horizontal" Spacing="20">
+                            <CheckBox x:Name="ChkUdp" Content="Enable UDP" IsChecked="True"/>
+                            <CheckBox x:Name="ChkTcp" Content="Enable TCP" IsChecked="True"/>
+                        </StackPanel>
+
+                        <TextBlock Text="Interface Settings" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,16,0,0"/>
+                        <ComboBox x:Name="DefaultLimitCombo" Header="Default DB View Limit" Width="200">
+                            <ComboBoxItem Content="20" Tag="20"/>
+                            <ComboBoxItem Content="50" Tag="50" IsSelected="True"/>
+                            <ComboBoxItem Content="100" Tag="100"/>
+                        </ComboBox>
+
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,20,0,0">
+                            <Button Content="Save Settings" Style="{ThemeResource AccentButtonStyle}" Click="OnSaveSettingsClicked"/>
+                            <Button Content="Restore Defaults" Click="OnRestoreDefaultsClicked"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </NavigationView>
+    </Grid>
+</Window>

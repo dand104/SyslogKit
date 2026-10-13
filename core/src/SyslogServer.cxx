@@ -5,7 +5,6 @@
 #ifdef _WIN32
     #include <winsock2.h>
     #include <ws2tcpip.h>
-    #pragma comment(lib, "Ws2_32.lib")
     using sock_t = SOCKET;
     #define CLOSE_SOCK closesocket
     #define INVALID_SOCK INVALID_SOCKET
@@ -79,13 +78,22 @@ namespace SyslogKit {
         }
 
         running_ = true;
-        if (udp) udp_thread_ = std::jthread(&Server::udp_loop, this, static_cast<uint64_t>(udp_fd));
-        if (tcp) tcp_thread_ = std::jthread(&Server::tcp_loop, this, static_cast<uint64_t>(tcp_fd));
+        if (udp) udp_thread_ = std::thread(&Server::udp_loop, this, static_cast<uint64_t>(udp_fd));
+        if (tcp) tcp_thread_ = std::thread(&Server::tcp_loop, this, static_cast<uint64_t>(tcp_fd));
 
         return true;
     }
 
-    void Server::stop() { running_ = false; }
+    void Server::stop() {
+        if (!running_) return;
+        running_ = false;
+        if (udp_thread_.joinable()) {
+            udp_thread_.join();
+        }
+        if (tcp_thread_.joinable()) {
+            tcp_thread_.join();
+        }
+    }
 
     void Server::udp_loop(const uint64_t raw_fd) const {
         const auto fd = raw_fd;

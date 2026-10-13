@@ -15,7 +15,7 @@ namespace SyslogKit {
     }
 
     bool LogStorage::open(const std::string& path) {
-        close(); // сlose previous if open
+        close();
         if (sqlite3_open(path.c_str(), &db_) != SQLITE_OK) return false;
 
         db_path_ = path;
@@ -32,7 +32,7 @@ namespace SyslogKit {
             CREATE TABLE IF NOT EXISTS logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 fac INTEGER, sev INTEGER,
-                ts TEXT, host TEXT, app TEXT, msg TEXT
+                ts TEXT, host TEXT, app TEXT, msg TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_ts ON logs(ts);
@@ -92,7 +92,9 @@ namespace SyslogKit {
             const std::string s = "%" + filter.search_text + "%";
             sqlite3_bind_text(stmt, idx++, s.c_str(), -1, SQLITE_TRANSIENT);
         }
-        sqlite3_bind_int(stmt, idx++, filter.limit);
+        if (filter.limit > 0) {
+            sqlite3_bind_int(stmt, idx++, filter.limit);
+        }
 
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             SyslogMessage m;

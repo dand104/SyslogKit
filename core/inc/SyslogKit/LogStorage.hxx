@@ -21,7 +21,7 @@ namespace SyslogKit {
         bool open(const std::string& path);
         void close();
         bool write(const SyslogMessage& msg) const;
-        std::vector<SyslogMessage> query(const LogFilter& filter) const;
+        [[nodiscard]] std::vector<SyslogMessage> query(const LogFilter& filter) const;
         bool clear_database(int up_to) const;
 
         [[nodiscard]] std::string get_db_path() const { return db_path_; }

@@ -1,0 +1,10 @@
+<Solution>
+  <Configurations>
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="winui/SyslogKitWin.vcxproj" Id="2b6e9026-2b0f-479d-b203-4df89ebf5589">
+    <Deploy />
+  </Project>
+</Solution>

@@ -13,8 +13,9 @@ Simple and portable Syslog server + client
 ![preview-configuration.png](preview-configuration.png)
 
 ## Project Structure
-- `common/`: Core logic, syslog protocol parsing, and SQLite storage implementation.
+- `core`: Core logic, syslog protocol parsing, and SQLite storage implementation.
 - `client/`: Qt-based graphical user interface source code.
+- `winui/`: WinUI3 based client source code. (Experimental)
 - `sender/`: Utility for testing syslog sending.
 
 ## Building from Source
@@ -26,8 +27,9 @@ Simple and portable Syslog server + client
 
 2. **Sample Build Command**:
    ```bash
-   cmake -B build
-   cmake --build build
+   cmake -B build -D (...options)
+   cmake --build build SyslogKitClient
+   cmake --install build
 
 ## License
 Copyright 2025-2026 dand104

@@ -32,3 +32,23 @@
 *.out
 *.app
 
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+x64/
+x86/
+ARM64/
+Win32/
+Generated Files/
+packages/
+AppPackages/
+BundleArtifacts/
+_deps/
+build/
+cmake-build-*/
+*.appxrecipe
+*.pri
+core/syslogkit_lib.props
+core/syslogkit_lib.targets
